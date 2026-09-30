@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Markdown to Word Converter</title>
-    <!-- Load the standalone Pandoc WASM script -->
-    <script src="https://cdn.jsdelivr.net/npm/pandoc-wasm@0.1.0/dist/pandoc-wasm.min.js"></script>
+    <title>Markdown & Math to Word Converter</title>
+    <!-- Verified Pandoc WebAssembly Engine from jsDelivr -->
+    <script src="https://cdn.jsdelivr.net/npm/pandoc-wasm@0.2.0/dist/pandoc-wasm.min.js"></script>
     <style>
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -57,7 +57,7 @@
 <body>
 
     <h1>Markdown & Math to Word</h1>
-    <p>Paste your Gemini output below to generate a Word (.docx) file with editable math formulas.</p>
+    <p>Paste your Gemini text below to generate a Word (.docx) file with editable math formulas.</p>
 
     <textarea id="input" placeholder="Paste markdown here...
 Example:
@@ -89,19 +89,34 @@ $$x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}$$"></textarea>
             showStatus("Initializing engine and converting... (first load takes a few seconds)");
 
             try {
-                // Check if global Pandoc object exists from the script tag
-                if (typeof pandoc === 'undefined') {
-                    throw new Error("Pandoc engine failed to load from CDN. Check your internet connection or firewall.");
+                if (typeof PandocWasm === 'undefined') {
+                    throw new Error("Pandoc engine failed to load from CDN. Check your internet connection.");
                 }
 
-                // Run pandoc conversion directly to binary docx
-                const docxBuffer = await pandoc(text, [
-                    '-f', 'markdown+tex_math_dollars',
-                    '-t', 'docx'
-                ]);
+                // Initialize Pandoc WebAssembly
+                const pandoc = await PandocWasm.init();
 
-                // Create a downloadable Blob file from the binary buffer
-                const blob = new Blob([docxBuffer], { 
+                // Run conversion with math extensions enabled
+                const result = await pandoc.run({
+                    text: text,
+                    options: {
+                        from: 'markdown+tex_math_dollars+tex_math_single_backslash',
+                        to: 'docx'
+                    }
+                });
+
+                // Extract base64 result and convert to blob
+                const base64Data = typeof result === 'string' ? result : result.text;
+                const cleanBase64 = base64Data.replace(/^data:.*;base64,/, '');
+                
+                const byteCharacters = atob(cleanBase64);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                
+                const blob = new Blob([byteArray], { 
                     type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
                 });
                 
